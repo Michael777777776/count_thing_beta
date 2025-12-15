@@ -35,17 +35,11 @@ button {
 .clear   { background:#ef4444; }
 .export  { background:#a855f7; }
 
-#canvasWrap {
-  overflow: hidden;
-  touch-action: none;
-}
-
 canvas {
   max-width: 100%;
   margin-top: 14px;
   border-radius: 14px;
   background:#000;
-  transform-origin: 0 0;
 }
 
 #result {
@@ -66,15 +60,13 @@ canvas {
 
 <div>
   <button class="ai" id="aiBtn" disabled>🤖 AI 初步偵測</button>
-  <button class="clear" id="clearBtn">🧹 清除</button>
+  <button class="clear" id="clearBtn">🧹 清除標記</button>
   <button class="export" id="exportBtn">📤 匯出</button>
 </div>
 
 <div id="result">⏳ 載入模型中…</div>
 
-<div id="canvasWrap">
-  <canvas id="canvas"></canvas>
-</div>
+<canvas id="canvas"></canvas>
 
 <input type="file" accept="image/*" hidden id="fileInput">
 <input type="file" accept="image/*" capture="environment" hidden id="cameraInput">
@@ -87,16 +79,9 @@ const aiBtn = document.getElementById("aiBtn");
 
 let img = new Image();
 let model;
-let points = [];
+let points = [];   // {x, y, source}
 
-// ====== 縮放相關 ======
-let scale = 1;
-let offsetX = 0;
-let offsetY = 0;
-let lastTouchDist = null;
-let lastTouchPos = null;
-
-/* 初始化 */
+/* ================= 初始化 ================= */
 async function init() {
   await tf.ready();
   await tf.setBackend("webgl");
@@ -106,16 +91,16 @@ async function init() {
 }
 window.onload = init;
 
-/* 載入圖片 */
+/* ================= 載入圖片 ================= */
 function loadImage(file) {
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = () => {
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       points = [];
-      scale = 1; offsetX = 0; offsetY = 0;
       redraw();
     };
     img.src = reader.result;
@@ -128,111 +113,103 @@ btnCamera.onclick = () => cameraInput.click();
 fileInput.onchange = e => loadImage(e.target.files[0]);
 cameraInput.onchange = e => loadImage(e.target.files[0]);
 
-/* AI 偵測 */
+/* ================= AI 偵測 ================= */
 aiBtn.onclick = async () => {
-  if (!img.src) return;
+  if (!model || !img.src) return;
 
   points = points.filter(p => p.source === "MANUAL");
 
   const preds = await model.detect(img);
   preds.forEach(p => {
-    const [x,y,w,h] = p.bbox;
+    const [x, y, w, h] = p.bbox;
     if (w > 60 && h > 60) {
-      const cx = x + w/2;
-      const cy = y + h/2;
-      if (!points.some(pt => Math.hypot(pt.x-cx, pt.y-cy) < 40)) {
-        points.push({ x: cx, y: cy, source:"AI" });
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      if (!isNear(cx, cy)) {
+        points.push({ x: cx, y: cy, source: "AI" });
       }
     }
   });
+
   redraw();
 };
 
-/* 點擊新增 / 刪除 */
+/* ================= 點擊新增 / 刪除 ================= */
 canvas.addEventListener("click", e => {
+  if (!img.src) return;
+
   const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left - offsetX) / scale;
-  const y = (e.clientY - rect.top - offsetY) / scale;
+  const x = (e.clientX - rect.left) * canvas.width / rect.width;
+  const y = (e.clientY - rect.top) * canvas.height / rect.height;
 
   const idx = points.findIndex(p =>
-    Math.hypot(p.x-x, p.y-y) < 18
+    Math.hypot(p.x - x, p.y - y) < 18
   );
 
-  if (idx >= 0) points.splice(idx,1);
-  else points.push({ x, y, source:"MANUAL" });
+  if (idx >= 0) points.splice(idx, 1);
+  else points.push({ x, y, source: "MANUAL" });
 
   redraw();
 });
 
-/* 清除 */
-clearBtn.onclick = () => { points = []; redraw(); };
+/* ================= 清除 ================= */
+clearBtn.onclick = () => {
+  points = [];
+  redraw();
+};
 
-/* 匯出圖片 */
+/* ================= 匯出圖片 ================= */
 exportBtn.onclick = () => {
   redraw(true);
+
   const link = document.createElement("a");
   link.download = "count_result.png";
   link.href = canvas.toDataURL("image/png");
   link.click();
-  redraw();
+
+  redraw(false);
 };
 
-/* 手機雙指縮放 + 拖曳 */
-canvas.addEventListener("touchstart", e => {
-  if (e.touches.length === 2) {
-    lastTouchDist = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
-  } else if (e.touches.length === 1) {
-    lastTouchPos = {x:e.touches[0].clientX, y:e.touches[0].clientY};
-  }
-});
+/* ================= 工具 ================= */
+function isNear(x, y) {
+  return points.some(p =>
+    Math.hypot(p.x - x, p.y - y) < 40
+  );
+}
 
-canvas.addEventListener("touchmove", e => {
-  e.preventDefault();
-  if (e.touches.length === 2) {
-    const dist = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
-    scale *= dist / lastTouchDist;
-    scale = Math.min(Math.max(scale, 0.5), 4);
-    lastTouchDist = dist;
-  } else if (e.touches.length === 1) {
-    offsetX += e.touches[0].clientX - lastTouchPos.x;
-    offsetY += e.touches[0].clientY - lastTouchPos.y;
-    lastTouchPos = {x:e.touches[0].clientX, y:e.touches[0].clientY};
-  }
-  redraw();
-});
+/* ================= 重繪 ================= */
+function redraw(exporting = false) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
 
-/* 重繪 */
-function redraw(exporting=false) {
-  ctx.setTransform(scale,0,0,scale,offsetX,offsetY);
-  ctx.clearRect(-offsetX/scale, -offsetY/scale, canvas.width/scale, canvas.height/scale);
-  ctx.drawImage(img,0,0);
-
-  points.forEach((p,i)=>{
+  points.forEach((p, i) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
-    ctx.fillStyle = p.source==="AI" ? "#22c55e" : "#f97316";
+    ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+    ctx.fillStyle = p.source === "AI" ? "#22c55e" : "#f97316";
     ctx.fill();
-    ctx.fillStyle="#fff";
-    ctx.font="bold 14px sans-serif";
-    ctx.fillText(i+1, p.x+12, p.y+4);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText(i + 1, p.x + 12, p.y + 4);
   });
 
+  const aiCount = points.filter(p => p.source === "AI").length;
+  const manualCount = points.length - aiCount;
+
   if (exporting) {
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.fillStyle="#000a";
-    ctx.fillRect(0, canvas.height-50, canvas.width, 50);
-    ctx.fillStyle="#fff";
-    ctx.font="bold 20px sans-serif";
-    ctx.fillText(`總數：${points.length}`, 16, canvas.height-18);
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 20px sans-serif";
+    ctx.fillText(
+      `總數：${points.length}（AI ${aiCount} + 手動 ${manualCount}）`,
+      16,
+      canvas.height - 18
+    );
   }
 
-  result.textContent = `🔢 目前數量：${points.length}`;
+  result.textContent =
+    `🔢 總數：${points.length}（AI ${aiCount} + 手動 ${manualCount}）`;
 }
 </script>
 
