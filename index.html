@@ -62,7 +62,6 @@ label {
   font-size:18px;
 }
 
-/* ===== 模式切換 ===== */
 #modeSwitch {
   display: flex;
   justify-content: center;
@@ -93,7 +92,6 @@ label {
 
 <h2>📦 AI + 手動補點計數</h2>
 
-<!-- ===== 模式切換 ===== -->
 <div id="modeSwitch">
   <button id="modeClassify" class="mode active">🎯 分類模式</button>
   <button id="modeDensity" class="mode">🌫 密度模式</button>
@@ -167,15 +165,12 @@ label {
 <input type="file" accept="image/*" capture="environment" hidden id="cameraInput">
 
 <script>
-/* ===== 全域參數 ===== */
 const POINT_RADIUS = 20;
 const HIT_RADIUS = 36;
 const CLUSTER_DISTANCE = 80;
 
-/* ===== 模式 ===== */
 let MODE = "CLASSIFY";
 
-/* ===== DOM ===== */
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const result = document.getElementById("result");
@@ -184,12 +179,10 @@ const aiBtn = document.getElementById("aiBtn");
 const modeClassify = document.getElementById("modeClassify");
 const modeDensity = document.getElementById("modeDensity");
 
-/* ===== 資料 ===== */
 let img = new Image();
 let model;
 let points = [];
 
-/* ===== 模式切換 ===== */
 modeClassify.onclick = () => switchMode("CLASSIFY");
 modeDensity.onclick  = () => switchMode("DENSITY");
 
@@ -204,10 +197,9 @@ function switchMode(m) {
   result.textContent =
     m === "CLASSIFY"
       ? "🎯 分類模式：依物件類型計數"
-      : "🌫 密度模式：不分種類，只算數量（尚未啟用）";
+      : "🌫 密度模式：不分種類，直接估算數量";
 }
 
-/* ===== 全選 / 全不選 ===== */
 selectAllBtn.onclick = () =>
   document.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = true);
 deselectAllBtn.onclick = () =>
@@ -220,7 +212,6 @@ function getSelectedClasses() {
   );
 }
 
-/* ===== 初始化 ===== */
 async function init() {
   await tf.ready();
   await tf.setBackend("webgl");
@@ -230,7 +221,6 @@ async function init() {
 }
 window.onload = init;
 
-/* ===== 載入圖片 ===== */
 function loadImage(file) {
   const reader = new FileReader();
   reader.onload = () => {
@@ -250,13 +240,12 @@ btnCamera.onclick = () => cameraInput.click();
 fileInput.onchange = e => loadImage(e.target.files[0]);
 cameraInput.onchange = e => loadImage(e.target.files[0]);
 
-/* ===== AI 偵測 ===== */
 aiBtn.onclick = async () => {
   if (!img.src) return;
   if (MODE === "CLASSIFY") runClassifyMode();
+  if (MODE === "DENSITY")  runDensityMode();
 };
 
-/* ===== 分類模式 ===== */
 async function runClassifyMode() {
   const selected = getSelectedClasses();
   if (selected.size === 0) {
@@ -279,7 +268,21 @@ async function runClassifyMode() {
   redraw();
 }
 
-/* ===== 分群 ===== */
+/* 🌫 密度模式 */
+async function runDensityMode() {
+  const manual = points.filter(p => p.source === "MANUAL");
+  const preds = await model.detect(img);
+
+  const raw = preds.map(p => ({
+    x: p.bbox[0] + p.bbox[2] / 2,
+    y: p.bbox[1] + p.bbox[3] / 2
+  }));
+
+  const clustered = cluster(raw);
+  points = [...manual, ...clustered.map(p => ({ ...p, source: "AI" }))];
+  redraw();
+}
+
 function cluster(arr) {
   const out = [];
   arr.forEach(p => {
@@ -292,7 +295,6 @@ function cluster(arr) {
   return out;
 }
 
-/* ===== 點擊新增 / 刪除 ===== */
 canvas.onclick = e => {
   const r = canvas.getBoundingClientRect();
   const x = (e.clientX - r.left) * canvas.width / r.width;
@@ -312,7 +314,6 @@ exportBtn.onclick = () => {
   a.click();
 };
 
-/* ===== 重繪 ===== */
 function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (img.src) ctx.drawImage(img, 0, 0);
