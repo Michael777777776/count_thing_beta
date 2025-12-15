@@ -61,7 +61,7 @@ canvas {
 <div>
   <button class="ai" id="aiBtn" disabled>🤖 AI 初步偵測</button>
   <button class="clear" id="clearBtn">🧹 清除標記</button>
-  <button class="export" id="exportBtn">📤 匯出</button>
+  <button class="export" id="exportBtn">📤 匯出圖片 + 數量</button>
 </div>
 
 <div id="result">⏳ 載入模型中…</div>
@@ -79,7 +79,7 @@ const aiBtn = document.getElementById("aiBtn");
 
 let img = new Image();
 let model;
-let points = [];   // {x, y, source}
+let points = []; // {x, y, source}
 
 /* ================= 初始化 ================= */
 async function init() {
@@ -94,7 +94,6 @@ window.onload = init;
 /* ================= 載入圖片 ================= */
 function loadImage(file) {
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = () => {
     img.onload = () => {
@@ -120,6 +119,7 @@ aiBtn.onclick = async () => {
   points = points.filter(p => p.source === "MANUAL");
 
   const preds = await model.detect(img);
+
   preds.forEach(p => {
     const [x, y, w, h] = p.bbox;
     if (w > 60 && h > 60) {
@@ -146,8 +146,11 @@ canvas.addEventListener("click", e => {
     Math.hypot(p.x - x, p.y - y) < 18
   );
 
-  if (idx >= 0) points.splice(idx, 1);
-  else points.push({ x, y, source: "MANUAL" });
+  if (idx >= 0) {
+    points.splice(idx, 1);
+  } else {
+    points.push({ x, y, source: "MANUAL" });
+  }
 
   redraw();
 });
@@ -158,16 +161,17 @@ clearBtn.onclick = () => {
   redraw();
 };
 
-/* ================= 匯出圖片 ================= */
+/* ================= 匯出 ================= */
 exportBtn.onclick = () => {
-  redraw(true);
+  if (!img.src) return alert("請先載入圖片");
+
+  const aiCount = points.filter(p => p.source === "AI").length;
+  const manualCount = points.length - aiCount;
 
   const link = document.createElement("a");
-  link.download = "count_result.png";
+  link.download = `count_${points.length}_AI${aiCount}_MANUAL${manualCount}.png`;
   link.href = canvas.toDataURL("image/png");
   link.click();
-
-  redraw(false);
 };
 
 /* ================= 工具 ================= */
@@ -178,7 +182,7 @@ function isNear(x, y) {
 }
 
 /* ================= 重繪 ================= */
-function redraw(exporting = false) {
+function redraw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(img, 0, 0);
 
@@ -195,18 +199,6 @@ function redraw(exporting = false) {
 
   const aiCount = points.filter(p => p.source === "AI").length;
   const manualCount = points.length - aiCount;
-
-  if (exporting) {
-    ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 20px sans-serif";
-    ctx.fillText(
-      `總數：${points.length}（AI ${aiCount} + 手動 ${manualCount}）`,
-      16,
-      canvas.height - 18
-    );
-  }
 
   result.textContent =
     `🔢 總數：${points.length}（AI ${aiCount} + 手動 ${manualCount}）`;
