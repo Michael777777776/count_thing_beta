@@ -85,11 +85,6 @@ label {
   color: #020617;
   opacity: 1;
 }
-
-#classifyPanel {
-  margin-bottom: 10px;
-}
-  
 </style>
 </head>
 
@@ -102,10 +97,8 @@ label {
   <button id="modeDensity" class="mode">🌫 密度模式</button>
 </div>
 
-<div id="classifyPanel">
-
-  <button id="selectAllBtn">✅ 全選</button>
-  <button id="deselectAllBtn">⛔ 全不選</button>
+<button id="selectAllBtn">✅ 全選</button>
+<button id="deselectAllBtn">⛔ 全不選</button>
 
 <!-- 👤 人與動物 -->
 <details>
@@ -193,14 +186,10 @@ let points = [];
 modeClassify.onclick = () => switchMode("CLASSIFY");
 modeDensity.onclick  = () => switchMode("DENSITY");
 
-const classifyPanel = document.getElementById("classifyPanel");
-  
 function switchMode(m) {
   MODE = m;
   modeClassify.classList.toggle("active", m === "CLASSIFY");
   modeDensity.classList.toggle("active", m === "DENSITY");
-
-  classifyPanel.style.display = (m === "CLASSIFY") ? "block" : "none";
 
   points = points.filter(p => p.source === "MANUAL");
   redraw();
@@ -346,5 +335,4 @@ function redraw() {
 
 </body>
 </html>
-
 
