@@ -9,25 +9,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 <style>
-
 #selectAllBtn { background:#16a34a; }
 #deselectAllBtn { background:#475569; }
-  
-details {
-  margin: 10px 0;
-}
 
+details { margin: 10px 0; }
 summary {
   cursor: pointer;
   font-weight: bold;
   font-size: 16px;
   padding: 6px 4px;
 }
+summary::marker { color: #38bdf8; }
 
-summary::marker {
-  color: #38bdf8;
-}
-  
 body {
   margin: 0;
   padding: 16px;
@@ -61,10 +54,7 @@ canvas {
   background:#000;
 }
 
-#result {
-  margin-top: 10px;
-  font-size: 18px;
-}
+#result { margin-top: 10px; font-size: 18px; }
 
 fieldset {
   border: 1px solid #334155;
@@ -74,10 +64,6 @@ fieldset {
   text-align: left;
 }
 
-legend {
-  padding: 0 6px;
-  font-weight: bold;
-}
 label {
   display: inline-block;
   margin: 4px 8px;
@@ -94,9 +80,6 @@ label {
   <button id="selectAllBtn">✅ 全選類型</button>
   <button id="deselectAllBtn">⛔ 全不選</button>
 </div>
-
-
-<!-- ===== 類型選單（可收合） ===== -->
 
 <details>
   <summary>👤 人與動物</summary>
@@ -141,7 +124,6 @@ label {
   </fieldset>
 </details>
 
-
 <div>
   <button class="gallery" id="btnGallery">🖼 相簿</button>
   <button class="camera" id="btnCamera">📸 相機</button>
@@ -165,31 +147,25 @@ const ctx = canvas.getContext("2d");
 const result = document.getElementById("result");
 const aiBtn = document.getElementById("aiBtn");
 
+const selectAllBtn = document.getElementById("selectAllBtn");
+const deselectAllBtn = document.getElementById("deselectAllBtn");
+
 let img = new Image();
 let model;
 let points = [];
 const CLUSTER_DISTANCE = 80;
 
-/* 取得勾選類型 */
-function getSelectedClasses() {
-
-/* ===== 類型 全選 / 全不選 ===== */
-const selectAllBtn = document.getElementById("selectAllBtn");
-const deselectAllBtn = document.getElementById("deselectAllBtn");
-
+/* ===== 全選 / 全不選（正確位置）===== */
 selectAllBtn.onclick = () => {
-  document
-    .querySelectorAll('input[type="checkbox"]')
-    .forEach(cb => cb.checked = true);
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
 };
 
 deselectAllBtn.onclick = () => {
-  document
-    .querySelectorAll('input[type="checkbox"]')
-    .forEach(cb => cb.checked = false);
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
 };
 
-
+/* 取得勾選類型 */
+function getSelectedClasses() {
   return new Set(
     [...document.querySelectorAll("input[type=checkbox]:checked")]
       .map(cb => cb.value)
@@ -238,11 +214,8 @@ aiBtn.onclick = async () => {
   const raw = [];
   preds.forEach(p => {
     if (!selected.has(p.class)) return;
-
     const [x, y, w, h] = p.bbox;
-    if (w > 60 && h > 60) {
-      raw.push({ x: x + w / 2, y: y + h / 2 });
-    }
+    if (w > 60 && h > 60) raw.push({ x: x + w / 2, y: y + h / 2 });
   });
 
   const clustered = clusterPoints(raw, CLUSTER_DISTANCE);
@@ -278,7 +251,6 @@ canvas.onclick = e => {
   const i = points.findIndex(p => Math.hypot(p.x - x, p.y - y) < 18);
   if (i >= 0) points.splice(i, 1);
   else points.push({ x, y, source: "MANUAL" });
-
   redraw();
 };
 
@@ -311,5 +283,3 @@ function redraw() {
 
 </body>
 </html>
-
-
