@@ -9,6 +9,22 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
 <style>
+
+details {
+  margin: 10px 0;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 6px 4px;
+}
+
+summary::marker {
+  color: #38bdf8;
+}
+  
 body {
   margin: 0;
   padding: 16px;
@@ -71,41 +87,51 @@ label {
 
 <h2>📦 AI + 手動補點計數</h2>
 
-<!-- ===== 類型選單 ===== -->
-<fieldset>
-  <legend>👤 人與動物</legend>
-  <label><input type="checkbox" value="person"> person</label>
-  <label><input type="checkbox" value="dog"> dog</label>
-  <label><input type="checkbox" value="cat"> cat</label>
-  <label><input type="checkbox" value="horse"> horse</label>
-  <label><input type="checkbox" value="cow"> cow</label>
-  <label><input type="checkbox" value="sheep"> sheep</label>
-</fieldset>
+<!-- ===== 類型選單（可收合） ===== -->
 
-<fieldset>
-  <legend>🚗 交通工具（預設）</legend>
-  <label><input type="checkbox" value="car" checked> car</label>
-  <label><input type="checkbox" value="truck" checked> truck</label>
-  <label><input type="checkbox" value="bus" checked> bus</label>
-  <label><input type="checkbox" value="motorcycle" checked> motorcycle</label>
-  <label><input type="checkbox" value="bicycle" checked> bicycle</label>
-</fieldset>
+<details>
+  <summary>👤 人與動物</summary>
+  <fieldset>
+    <label><input type="checkbox" value="person"> person</label>
+    <label><input type="checkbox" value="dog"> dog</label>
+    <label><input type="checkbox" value="cat"> cat</label>
+    <label><input type="checkbox" value="horse"> horse</label>
+    <label><input type="checkbox" value="cow"> cow</label>
+    <label><input type="checkbox" value="sheep"> sheep</label>
+  </fieldset>
+</details>
 
-<fieldset>
-  <legend>👜 隨身物品</legend>
-  <label><input type="checkbox" value="backpack"> backpack</label>
-  <label><input type="checkbox" value="handbag"> handbag</label>
-  <label><input type="checkbox" value="suitcase"> suitcase</label>
-</fieldset>
+<details open>
+  <summary>🚗 交通工具（預設）</summary>
+  <fieldset>
+    <label><input type="checkbox" value="car" checked> car</label>
+    <label><input type="checkbox" value="truck" checked> truck</label>
+    <label><input type="checkbox" value="bus" checked> bus</label>
+    <label><input type="checkbox" value="motorcycle" checked> motorcycle</label>
+    <label><input type="checkbox" value="bicycle" checked> bicycle</label>
+  </fieldset>
+</details>
 
-<fieldset>
-  <legend>🍽 生活用品</legend>
-  <label><input type="checkbox" value="chair"> chair</label>
-  <label><input type="checkbox" value="dining table"> table</label>
-  <label><input type="checkbox" value="tv"> tv</label>
-  <label><input type="checkbox" value="laptop"> laptop</label>
-  <label><input type="checkbox" value="cell phone"> phone</label>
-</fieldset>
+<details>
+  <summary>👜 隨身物品</summary>
+  <fieldset>
+    <label><input type="checkbox" value="backpack"> backpack</label>
+    <label><input type="checkbox" value="handbag"> handbag</label>
+    <label><input type="checkbox" value="suitcase"> suitcase</label>
+  </fieldset>
+</details>
+
+<details>
+  <summary>🍽 生活用品</summary>
+  <fieldset>
+    <label><input type="checkbox" value="chair"> chair</label>
+    <label><input type="checkbox" value="dining table"> table</label>
+    <label><input type="checkbox" value="tv"> tv</label>
+    <label><input type="checkbox" value="laptop"> laptop</label>
+    <label><input type="checkbox" value="cell phone"> phone</label>
+  </fieldset>
+</details>
+
 
 <div>
   <button class="gallery" id="btnGallery">🖼 相簿</button>
@@ -258,3 +284,4 @@ function redraw() {
 
 </body>
 </html>
+
