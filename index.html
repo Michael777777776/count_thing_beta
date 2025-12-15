@@ -102,6 +102,42 @@ label {
 <button id="selectAllBtn">✅ 全選</button>
 <button id="deselectAllBtn">⛔ 全不選</button>
 
+<!-- 👤 人與動物 -->
+<details>
+<summary>👤 人與動物</summary>
+<fieldset>
+<label><input type="checkbox" value="person"> 人 person</label>
+<label><input type="checkbox" value="dog"> 狗 dog</label>
+<label><input type="checkbox" value="cat"> 貓 cat</label>
+<label><input type="checkbox" value="horse"> 馬 horse</label>
+<label><input type="checkbox" value="cow"> 牛 cow</label>
+<label><input type="checkbox" value="sheep"> 羊 sheep</label>
+</fieldset>
+</details>
+
+<!-- 👜 隨身物品 -->
+<details>
+<summary>👜 隨身物品</summary>
+<fieldset>
+<label><input type="checkbox" value="backpack"> 後背包 backpack</label>
+<label><input type="checkbox" value="handbag"> 手提包 handbag</label>
+<label><input type="checkbox" value="suitcase"> 行李箱 suitcase</label>
+</fieldset>
+</details>
+
+<!-- 🍽 生活用品 -->
+<details>
+<summary>🍽 生活用品</summary>
+<fieldset>
+<label><input type="checkbox" value="chair"> 椅子 chair</label>
+<label><input type="checkbox" value="diningtable"> 桌子 table</label>
+<label><input type="checkbox" value="tv"> 電視機 tv</label>
+<label><input type="checkbox" value="laptop"> 筆電 laptop</label>
+<label><input type="checkbox" value="cellphone"> 手機 phone</label>
+</fieldset>
+</details>
+
+<!-- 🚗 交通工具 -->
 <details open>
 <summary>🚗 交通工具</summary>
 <fieldset>
@@ -137,7 +173,7 @@ const HIT_RADIUS = 36;
 const CLUSTER_DISTANCE = 80;
 
 /* ===== 模式 ===== */
-let MODE = "CLASSIFY"; // CLASSIFY | DENSITY
+let MODE = "CLASSIFY";
 
 /* ===== DOM ===== */
 const canvas = document.getElementById("canvas");
@@ -162,7 +198,6 @@ function switchMode(m) {
   modeClassify.classList.toggle("active", m === "CLASSIFY");
   modeDensity.classList.toggle("active", m === "DENSITY");
 
-  // 只保留手動點
   points = points.filter(p => p.source === "MANUAL");
   redraw();
 
@@ -215,20 +250,20 @@ btnCamera.onclick = () => cameraInput.click();
 fileInput.onchange = e => loadImage(e.target.files[0]);
 cameraInput.onchange = e => loadImage(e.target.files[0]);
 
-/* ===== AI 偵測入口 ===== */
+/* ===== AI 偵測 ===== */
 aiBtn.onclick = async () => {
   if (!img.src) return;
-
-  if (MODE === "CLASSIFY") {
-    runClassifyMode();
-  } else {
-    alert("🌫 密度模式尚未啟用（下一步可直接幫你加）");
-  }
+  if (MODE === "CLASSIFY") runClassifyMode();
 };
 
 /* ===== 分類模式 ===== */
 async function runClassifyMode() {
   const selected = getSelectedClasses();
+  if (selected.size === 0) {
+    alert("請至少選擇一個偵測類型");
+    return;
+  }
+
   const manual = points.filter(p => p.source === "MANUAL");
   const preds = await model.detect(img);
 
