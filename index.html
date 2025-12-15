@@ -79,7 +79,9 @@ const aiBtn = document.getElementById("aiBtn");
 
 let img = new Image();
 let model;
-let points = []; // {x, y, source}
+let points = []; // 最終顯示點（AI + MANUAL）
+
+const CLUSTER_DISTANCE = 80; // ⭐ 固定距離分群（可調）
 
 /* ================= 初始化 ================= */
 async function init() {
@@ -112,27 +114,64 @@ btnCamera.onclick = () => cameraInput.click();
 fileInput.onchange = e => loadImage(e.target.files[0]);
 cameraInput.onchange = e => loadImage(e.target.files[0]);
 
-/* ================= AI 偵測 ================= */
+/* ================= AI 偵測 + 分群 ================= */
 aiBtn.onclick = async () => {
   if (!model || !img.src) return;
 
-  points = points.filter(p => p.source === "MANUAL");
+  // 保留手動點
+  const manualPoints = points.filter(p => p.source === "MANUAL");
 
   const preds = await model.detect(img);
 
+  // ① 收集 AI 原始中心點
+  const rawPoints = [];
   preds.forEach(p => {
     const [x, y, w, h] = p.bbox;
     if (w > 60 && h > 60) {
-      const cx = x + w / 2;
-      const cy = y + h / 2;
-      if (!isNear(cx, cy)) {
-        points.push({ x: cx, y: cy, source: "AI" });
-      }
+      rawPoints.push({
+        x: x + w / 2,
+        y: y + h / 2
+      });
     }
   });
 
+  // ② 固定距離分群
+  const clustered = clusterPoints(rawPoints, CLUSTER_DISTANCE);
+
+  // ③ 組合最終點
+  points = [
+    ...manualPoints,
+    ...clustered.map(p => ({ ...p, source: "AI" }))
+  ];
+
   redraw();
 };
+
+/* ================= 固定距離分群 ================= */
+function clusterPoints(raw, dist) {
+  const clusters = [];
+
+  raw.forEach(pt => {
+    let added = false;
+
+    for (const c of clusters) {
+      if (Math.hypot(c.x - pt.x, c.y - pt.y) < dist) {
+        // 更新群中心（平均）
+        c.x = (c.x * c.count + pt.x) / (c.count + 1);
+        c.y = (c.y * c.count + pt.y) / (c.count + 1);
+        c.count++;
+        added = true;
+        break;
+      }
+    }
+
+    if (!added) {
+      clusters.push({ x: pt.x, y: pt.y, count: 1 });
+    }
+  });
+
+  return clusters;
+}
 
 /* ================= 點擊新增 / 刪除 ================= */
 canvas.addEventListener("click", e => {
@@ -173,13 +212,6 @@ exportBtn.onclick = () => {
   link.href = canvas.toDataURL("image/png");
   link.click();
 };
-
-/* ================= 工具 ================= */
-function isNear(x, y) {
-  return points.some(p =>
-    Math.hypot(p.x - x, p.y - y) < 40
-  );
-}
 
 /* ================= 重繪 ================= */
 function redraw() {
