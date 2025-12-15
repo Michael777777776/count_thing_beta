@@ -10,6 +10,9 @@
 
 <style>
 
+#selectAllBtn { background:#16a34a; }
+#deselectAllBtn { background:#475569; }
+  
 details {
   margin: 10px 0;
 }
@@ -87,6 +90,12 @@ label {
 
 <h2>📦 AI + 手動補點計數</h2>
 
+<div style="margin-bottom:10px;">
+  <button id="selectAllBtn">✅ 全選類型</button>
+  <button id="deselectAllBtn">⛔ 全不選</button>
+</div>
+
+
 <!-- ===== 類型選單（可收合） ===== -->
 
 <details>
@@ -163,6 +172,24 @@ const CLUSTER_DISTANCE = 80;
 
 /* 取得勾選類型 */
 function getSelectedClasses() {
+
+/* ===== 類型 全選 / 全不選 ===== */
+const selectAllBtn = document.getElementById("selectAllBtn");
+const deselectAllBtn = document.getElementById("deselectAllBtn");
+
+selectAllBtn.onclick = () => {
+  document
+    .querySelectorAll('input[type="checkbox"]')
+    .forEach(cb => cb.checked = true);
+};
+
+deselectAllBtn.onclick = () => {
+  document
+    .querySelectorAll('input[type="checkbox"]')
+    .forEach(cb => cb.checked = false);
+};
+
+
   return new Set(
     [...document.querySelectorAll("input[type=checkbox]:checked")]
       .map(cb => cb.value)
@@ -284,4 +311,5 @@ function redraw() {
 
 </body>
 </html>
+
 
