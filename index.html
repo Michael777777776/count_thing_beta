@@ -97,12 +97,10 @@ label {
   <button id="modeDensity" class="mode">🌫 密度模式</button>
 </div>
 
-<!-- 🔽 分類模式專用區塊 -->
-<div id="classifyPanel">
-
 <button id="selectAllBtn">✅ 全選</button>
 <button id="deselectAllBtn">⛔ 全不選</button>
 
+<!-- 👤 人與動物 -->
 <details>
 <summary>👤 人與動物</summary>
 <fieldset>
@@ -115,26 +113,29 @@ label {
 </fieldset>
 </details>
 
+<!-- 👜 隨身物品 -->
 <details>
 <summary>👜 隨身物品</summary>
 <fieldset>
-<label><input type="checkbox" value="backpack"> 後背包</label>
-<label><input type="checkbox" value="handbag"> 手提包</label>
-<label><input type="checkbox" value="suitcase"> 行李箱</label>
+<label><input type="checkbox" value="backpack"> 後背包 backpack</label>
+<label><input type="checkbox" value="handbag"> 手提包 handbag</label>
+<label><input type="checkbox" value="suitcase"> 行李箱 suitcase</label>
 </fieldset>
 </details>
 
+<!-- 🍽 生活用品 -->
 <details>
 <summary>🍽 生活用品</summary>
 <fieldset>
-<label><input type="checkbox" value="chair"> 椅子</label>
-<label><input type="checkbox" value="diningtable"> 桌子</label>
-<label><input type="checkbox" value="tv"> 電視</label>
-<label><input type="checkbox" value="laptop"> 筆電</label>
-<label><input type="checkbox" value="cellphone"> 手機</label>
+<label><input type="checkbox" value="chair"> 椅子 chair</label>
+<label><input type="checkbox" value="diningtable"> 桌子 table</label>
+<label><input type="checkbox" value="tv"> 電視機 tv</label>
+<label><input type="checkbox" value="laptop"> 筆電 laptop</label>
+<label><input type="checkbox" value="cellphone"> 手機 phone</label>
 </fieldset>
 </details>
 
+<!-- 🚗 交通工具 -->
 <details open>
 <summary>🚗 交通工具</summary>
 <fieldset>
@@ -145,8 +146,6 @@ label {
 <label><input type="checkbox" value="bicycle" checked> bicycle</label>
 </fieldset>
 </details>
-
-</div>
 
 <div>
 <button class="gallery" id="btnGallery">🖼 相簿</button>
@@ -176,7 +175,6 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const result = document.getElementById("result");
 const aiBtn = document.getElementById("aiBtn");
-const classifyPanel = document.getElementById("classifyPanel");
 
 const modeClassify = document.getElementById("modeClassify");
 const modeDensity = document.getElementById("modeDensity");
@@ -193,8 +191,6 @@ function switchMode(m) {
   modeClassify.classList.toggle("active", m === "CLASSIFY");
   modeDensity.classList.toggle("active", m === "DENSITY");
 
-  classifyPanel.style.display = m === "CLASSIFY" ? "block" : "none";
-
   points = points.filter(p => p.source === "MANUAL");
   redraw();
 
@@ -204,8 +200,139 @@ function switchMode(m) {
       : "🌫 密度模式：不分種類，直接估算數量";
 }
 
-/* 其餘 JS 保持原樣（未省略） */
+selectAllBtn.onclick = () =>
+  document.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = true);
+deselectAllBtn.onclick = () =>
+  document.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = false);
+
+function getSelectedClasses() {
+  return new Set(
+    [...document.querySelectorAll("input[type=checkbox]:checked")]
+      .map(c => c.value)
+  );
+}
+
+async function init() {
+  await tf.ready();
+  await tf.setBackend("webgl");
+  model = await cocoSsd.load();
+  aiBtn.disabled = false;
+  result.textContent = "✅ 模型就緒，請載入照片";
+}
+window.onload = init;
+
+function loadImage(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      points = [];
+      redraw();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+btnGallery.onclick = () => fileInput.click();
+btnCamera.onclick = () => cameraInput.click();
+fileInput.onchange = e => loadImage(e.target.files[0]);
+cameraInput.onchange = e => loadImage(e.target.files[0]);
+
+aiBtn.onclick = async () => {
+  if (!img.src) return;
+  if (MODE === "CLASSIFY") runClassifyMode();
+  if (MODE === "DENSITY")  runDensityMode();
+};
+
+async function runClassifyMode() {
+  const selected = getSelectedClasses();
+  if (selected.size === 0) {
+    alert("請至少選擇一個偵測類型");
+    return;
+  }
+
+  const manual = points.filter(p => p.source === "MANUAL");
+  const preds = await model.detect(img);
+
+  const raw = preds
+    .filter(p => selected.has(p.class))
+    .map(p => ({
+      x: p.bbox[0] + p.bbox[2] / 2,
+      y: p.bbox[1] + p.bbox[3] / 2
+    }));
+
+  const clustered = cluster(raw);
+  points = [...manual, ...clustered.map(p => ({ ...p, source: "AI" }))];
+  redraw();
+}
+
+/* 🌫 密度模式 */
+async function runDensityMode() {
+  const manual = points.filter(p => p.source === "MANUAL");
+  const preds = await model.detect(img);
+
+  const raw = preds.map(p => ({
+    x: p.bbox[0] + p.bbox[2] / 2,
+    y: p.bbox[1] + p.bbox[3] / 2
+  }));
+
+  const clustered = cluster(raw);
+  points = [...manual, ...clustered.map(p => ({ ...p, source: "AI" }))];
+  redraw();
+}
+
+function cluster(arr) {
+  const out = [];
+  arr.forEach(p => {
+    const c = out.find(o => Math.hypot(o.x - p.x, o.y - p.y) < CLUSTER_DISTANCE);
+    if (c) {
+      c.x = (c.x + p.x) / 2;
+      c.y = (c.y + p.y) / 2;
+    } else out.push({ ...p });
+  });
+  return out;
+}
+
+canvas.onclick = e => {
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) * canvas.width / r.width;
+  const y = (e.clientY - r.top) * canvas.height / r.height;
+
+  const i = points.findIndex(p => Math.hypot(p.x - x, p.y - y) < HIT_RADIUS);
+  i >= 0 ? points.splice(i, 1) : points.push({ x, y, source: "MANUAL" });
+  redraw();
+};
+
+clearBtn.onclick = () => { points = []; redraw(); };
+
+exportBtn.onclick = () => {
+  const a = document.createElement("a");
+  a.download = `count_${points.length}.png`;
+  a.href = canvas.toDataURL();
+  a.click();
+};
+
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (img.src) ctx.drawImage(img, 0, 0);
+
+  points.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = p.source === "AI" ? "#22c55e" : "#f97316";
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "16px sans-serif";
+    ctx.fillText(i + 1, p.x + POINT_RADIUS + 6, p.y + 6);
+  });
+
+  result.textContent = `🔢 總數：${points.length}`;
+}
 </script>
 
 </body>
 </html>
+
