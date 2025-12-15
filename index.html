@@ -42,11 +42,40 @@ canvas {
   background:#000;
 }
 
+details { margin: 10px 0; text-align:left; }
+summary { cursor:pointer; font-weight:bold; }
+
+fieldset {
+  border:1px solid #334155;
+  border-radius:12px;
+  padding:10px;
+}
+
+label {
+  display:inline-block;
+  margin:4px 8px;
+  font-size:14px;
+}
+
+#result {
+  margin-top:10px;
+  font-size:18px;
+}
+
+#modeSwitch {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0 6px;
+}
+
 .mode {
   padding: 10px 16px;
   border-radius: 999px;
+  font-size: 14px;
   background: #334155;
   color: #e5e7eb;
+  border: none;
   font-weight: bold;
   opacity: 0.6;
 }
@@ -63,10 +92,60 @@ canvas {
 
 <h2>📦 AI + 手動補點計數</h2>
 
-<div>
+<div id="modeSwitch">
   <button id="modeClassify" class="mode active">🎯 分類模式</button>
   <button id="modeDensity" class="mode">🌫 密度模式</button>
 </div>
+
+<button id="selectAllBtn">✅ 全選</button>
+<button id="deselectAllBtn">⛔ 全不選</button>
+
+<!-- 👤 人與動物 -->
+<details>
+<summary>👤 人與動物</summary>
+<fieldset>
+<label><input type="checkbox" value="person"> 人 person</label>
+<label><input type="checkbox" value="dog"> 狗 dog</label>
+<label><input type="checkbox" value="cat"> 貓 cat</label>
+<label><input type="checkbox" value="horse"> 馬 horse</label>
+<label><input type="checkbox" value="cow"> 牛 cow</label>
+<label><input type="checkbox" value="sheep"> 羊 sheep</label>
+</fieldset>
+</details>
+
+<!-- 👜 隨身物品 -->
+<details>
+<summary>👜 隨身物品</summary>
+<fieldset>
+<label><input type="checkbox" value="backpack"> 後背包 backpack</label>
+<label><input type="checkbox" value="handbag"> 手提包 handbag</label>
+<label><input type="checkbox" value="suitcase"> 行李箱 suitcase</label>
+</fieldset>
+</details>
+
+<!-- 🍽 生活用品 -->
+<details>
+<summary>🍽 生活用品</summary>
+<fieldset>
+<label><input type="checkbox" value="chair"> 椅子 chair</label>
+<label><input type="checkbox" value="diningtable"> 桌子 table</label>
+<label><input type="checkbox" value="tv"> 電視機 tv</label>
+<label><input type="checkbox" value="laptop"> 筆電 laptop</label>
+<label><input type="checkbox" value="cellphone"> 手機 phone</label>
+</fieldset>
+</details>
+
+<!-- 🚗 交通工具 -->
+<details open>
+<summary>🚗 交通工具</summary>
+<fieldset>
+<label><input type="checkbox" value="car" checked> car</label>
+<label><input type="checkbox" value="truck" checked> truck</label>
+<label><input type="checkbox" value="bus" checked> bus</label>
+<label><input type="checkbox" value="motorcycle" checked> motorcycle</label>
+<label><input type="checkbox" value="bicycle" checked> bicycle</label>
+</fieldset>
+</details>
 
 <div>
 <button class="gallery" id="btnGallery">🖼 相簿</button>
@@ -86,18 +165,23 @@ canvas {
 <input type="file" accept="image/*" capture="environment" hidden id="cameraInput">
 
 <script>
+const POINT_RADIUS = 20;
 const HIT_RADIUS = 36;
 const CLUSTER_DISTANCE = 80;
 
 let MODE = "CLASSIFY";
-let img = new Image();
-let model;
-let points = [];
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const result = document.getElementById("result");
 const aiBtn = document.getElementById("aiBtn");
+
+const modeClassify = document.getElementById("modeClassify");
+const modeDensity = document.getElementById("modeDensity");
+
+let img = new Image();
+let model;
+let points = [];
 
 modeClassify.onclick = () => switchMode("CLASSIFY");
 modeDensity.onclick  = () => switchMode("DENSITY");
@@ -106,8 +190,26 @@ function switchMode(m) {
   MODE = m;
   modeClassify.classList.toggle("active", m === "CLASSIFY");
   modeDensity.classList.toggle("active", m === "DENSITY");
+
   points = points.filter(p => p.source === "MANUAL");
   redraw();
+
+  result.textContent =
+    m === "CLASSIFY"
+      ? "🎯 分類模式：依物件類型計數"
+      : "🌫 密度模式：不分種類，直接估算數量";
+}
+
+selectAllBtn.onclick = () =>
+  document.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = true);
+deselectAllBtn.onclick = () =>
+  document.querySelectorAll("input[type=checkbox]").forEach(c => c.checked = false);
+
+function getSelectedClasses() {
+  return new Set(
+    [...document.querySelectorAll("input[type=checkbox]:checked")]
+      .map(c => c.value)
+  );
 }
 
 async function init() {
@@ -115,7 +217,7 @@ async function init() {
   await tf.setBackend("webgl");
   model = await cocoSsd.load();
   aiBtn.disabled = false;
-  result.textContent = "✅ 模型就緒";
+  result.textContent = "✅ 模型就緒，請載入照片";
 }
 window.onload = init;
 
@@ -139,56 +241,95 @@ fileInput.onchange = e => loadImage(e.target.files[0]);
 cameraInput.onchange = e => loadImage(e.target.files[0]);
 
 aiBtn.onclick = async () => {
+  if (!img.src) return;
+  if (MODE === "CLASSIFY") runClassifyMode();
+  if (MODE === "DENSITY")  runDensityMode();
+};
+
+async function runClassifyMode() {
+  const selected = getSelectedClasses();
+  if (selected.size === 0) {
+    alert("請至少選擇一個偵測類型");
+    return;
+  }
+
+  const manual = points.filter(p => p.source === "MANUAL");
   const preds = await model.detect(img);
+
+  const raw = preds
+    .filter(p => selected.has(p.class))
+    .map(p => ({
+      x: p.bbox[0] + p.bbox[2] / 2,
+      y: p.bbox[1] + p.bbox[3] / 2
+    }));
+
+  const clustered = cluster(raw);
+  points = [...manual, ...clustered.map(p => ({ ...p, source: "AI" }))];
+  redraw();
+}
+
+/* 🌫 密度模式 */
+async function runDensityMode() {
+  const manual = points.filter(p => p.source === "MANUAL");
+  const preds = await model.detect(img);
+
   const raw = preds.map(p => ({
     x: p.bbox[0] + p.bbox[2] / 2,
     y: p.bbox[1] + p.bbox[3] / 2
   }));
-  points = [...points.filter(p => p.source === "MANUAL"),
-            ...cluster(raw).map(p => ({...p, source:"AI"}))];
+
+  const clustered = cluster(raw);
+  points = [...manual, ...clustered.map(p => ({ ...p, source: "AI" }))];
   redraw();
-};
+}
 
 function cluster(arr) {
   const out = [];
   arr.forEach(p => {
-    const c = out.find(o => Math.hypot(o.x-p.x,o.y-p.y)<CLUSTER_DISTANCE);
-    c ? (c.x=(c.x+p.x)/2,c.y=(c.y+p.y)/2) : out.push({...p});
+    const c = out.find(o => Math.hypot(o.x - p.x, o.y - p.y) < CLUSTER_DISTANCE);
+    if (c) {
+      c.x = (c.x + p.x) / 2;
+      c.y = (c.y + p.y) / 2;
+    } else out.push({ ...p });
   });
   return out;
 }
 
 canvas.onclick = e => {
   const r = canvas.getBoundingClientRect();
-  const x = (e.clientX-r.left)*canvas.width/r.width;
-  const y = (e.clientY-r.top)*canvas.height/r.height;
-  const i = points.findIndex(p => Math.hypot(p.x-x,p.y-y)<HIT_RADIUS);
-  i>=0 ? points.splice(i,1) : points.push({x,y,source:"MANUAL"});
+  const x = (e.clientX - r.left) * canvas.width / r.width;
+  const y = (e.clientY - r.top) * canvas.height / r.height;
+
+  const i = points.findIndex(p => Math.hypot(p.x - x, p.y - y) < HIT_RADIUS);
+  i >= 0 ? points.splice(i, 1) : points.push({ x, y, source: "MANUAL" });
   redraw();
 };
 
-clearBtn.onclick = () => { points=[]; redraw(); };
+clearBtn.onclick = () => { points = []; redraw(); };
 
 exportBtn.onclick = () => {
-  const a=document.createElement("a");
-  a.download=`count_${points.length}.png`;
-  a.href=canvas.toDataURL();
+  const a = document.createElement("a");
+  a.download = `count_${points.length}.png`;
+  a.href = canvas.toDataURL();
   a.click();
 };
 
 function redraw() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(img.src) ctx.drawImage(img,0,0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (img.src) ctx.drawImage(img, 0, 0);
 
-  points.forEach((p,i)=>{
-    ctx.fillStyle=p.source==="AI"?"#22c55e":"#f97316";
-    ctx.font="bold 18px sans-serif";
-    ctx.textAlign="center";
-    ctx.textBaseline="middle";
-    ctx.fillText(i+1,p.x,p.y);
+  points.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = p.source === "AI" ? "#22c55e" : "#f97316";
+    ctx.fill();
+
+    ctx.fillStyle = "#fff";
+    ctx.font = "16px sans-serif";
+    ctx.fillText(i + 1, p.x + POINT_RADIUS + 6, p.y + 6);
   });
 
-  result.textContent=`🔢 總數：${points.length}`;
+  result.textContent = `🔢 總數：${points.length}`;
 }
 </script>
 
